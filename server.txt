@@ -1,0 +1,525 @@
+const express = require("express");
+const puppeteer = require("puppeteer-extra");
+const StealthPlugin = require("puppeteer-extra-plugin-stealth");
+const cors = require("cors");
+const fs = require("fs");
+const path = require("path");
+require("dotenv").config();
+
+puppeteer.use(StealthPlugin());
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// --- Setup folders ---
+const cookiesDir = path.join(__dirname, "cookies");
+const profileDir = path.join(__dirname, "puppeteer_profile");
+if (!fs.existsSync(cookiesDir)) fs.mkdirSync(cookiesDir);
+if (!fs.existsSync(profileDir)) fs.mkdirSync(profileDir);
+
+app.use(express.json());
+app.use(cors({ origin: "*", methods: ["GET", "POST"], allowedHeaders: ["Content-Type"] }));
+app.use(express.static(__dirname));
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Session manager
+class SessionManager {
+  constructor(name) {
+    this.cookiePath = path.join(cookiesDir, `${name}_cookies.json`);
+  }
+
+  saveCookies(cookies) {
+    fs.writeFileSync(this.cookiePath, JSON.stringify(cookies, null, 2));
+    console.log("✅ Saved", cookies.length, "cookies");
+  }
+
+  loadCookies() {
+    if (!fs.existsSync(this.cookiePath)) return null;
+    const cookies = JSON.parse(fs.readFileSync(this.cookiePath));
+    console.log("🍪 Loaded", cookies.length, "cookies");
+    return cookies;
+  }
+}
+
+const mydataSession = new SessionManager("mydata");
+
+// --- API Endpoint ---
+app.post("/api/start-check", async (req, res) => {
+  const { companyName, services = ["mydata"] } = req.body;
+  if (!companyName) return res.status(400).json({ error: "Company name is required" });
+
+  console.log(`\n🚀 Searching: ${companyName}\n`);
+  
+  try {
+    const results = {};
+    for (const service of services) {
+      if (service === "mydata") results.mydata = await checkMyData(companyName);
+      else if (service === "ssm") results.ssm = await checkSSM(companyName);
+    }
+
+    const anyExists = Object.values(results).some((r) => r.exists);
+    res.json({
+      success: true,
+      query: companyName,
+      exists: anyExists,
+      results,
+    });
+  } catch (error) {
+    console.error("❌ Error:", error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// --- MyData Scraper with Pagination and Company Filter ---
+async function checkMyData(companyName) {
+  let browser, page;
+  const cookies = mydataSession.loadCookies();
+  const hasSession = cookies && cookies.length > 0;
+  const autoLogin = process.env.AUTO_LOGIN === 'true';
+  const hasCredentials = process.env.MYDATA_USERNAME && process.env.MYDATA_PASSWORD;
+  
+  let isHeadless = hasSession;
+  let justLoggedIn = false;
+
+  try {
+    console.log(isHeadless ? "👻 Headless mode" : "🟢 Visible mode");
+    
+    browser = await puppeteer.launch({
+      headless: isHeadless,
+      userDataDir: profileDir,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+    });
+
+    const pages = await browser.pages();
+    page = pages[0] || (await browser.newPage());
+    await page.setViewport({ width: 1280, height: 800 });
+
+    if (cookies) await page.setCookie(...cookies);
+
+    const targetUrl = (autoLogin && hasCredentials && !hasSession) 
+      ? "https://www.mydata-ssm.com.my/login" 
+      : "https://www.mydata-ssm.com.my/home";
+    
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await delay(2000);
+
+    // Check if login needed
+    const needsLogin = await page.evaluate(() => {
+      const url = window.location.href;
+      const hasLoginForm = document.querySelector('input[type="password"]') !== null;
+      const hasSearchBox = document.querySelector('input[placeholder*="search" i]') !== null;
+      return url.includes('login') || (hasLoginForm && !hasSearchBox);
+    });
+
+    if (needsLogin) {
+      console.log("⚠️ Login required");
+
+      if (isHeadless) {
+        await browser.close();
+        browser = await puppeteer.launch({
+          headless: false,
+          userDataDir: profileDir,
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        });
+        page = (await browser.pages())[0] || (await browser.newPage());
+        await page.setViewport({ width: 1280, height: 800 });
+        await page.goto("https://www.mydata-ssm.com.my/login", { waitUntil: "domcontentloaded" });
+        await delay(2000);
+        isHeadless = false;
+      }
+
+      if (autoLogin && hasCredentials) {
+        console.log("🤖 Auto-login...");
+        
+        try {
+          await delay(2000);
+          
+          const usernameSelector = 'input[name="userName"], input[placeholder*="username" i]';
+          await page.waitForSelector(usernameSelector, { timeout: 10000 });
+          await page.click(usernameSelector);
+          await page.type(usernameSelector, process.env.MYDATA_USERNAME, { delay: 100 });
+          console.log("✅ Username entered");
+          
+          const passwordSelector = 'input[type="password"]';
+          await page.waitForSelector(passwordSelector, { timeout: 10000 });
+          await page.click(passwordSelector);
+          await page.type(passwordSelector, process.env.MYDATA_PASSWORD, { delay: 100 });
+          console.log("✅ Password entered");
+          
+          await delay(1000);
+          await page.keyboard.press('Enter');
+          console.log("⏳ Logging in...");
+          
+          try {
+            await page.waitForNavigation({ timeout: 15000, waitUntil: "networkidle2" });
+          } catch {}
+          
+          await delay(3000);
+          
+          const loginSuccess = await page.evaluate(() => {
+            const url = window.location.href;
+            const hasSearchBox = document.querySelector('input[placeholder*="search" i]') !== null;
+            return !url.includes('login') && hasSearchBox;
+          });
+          
+          if (loginSuccess) {
+            console.log("✅ Auto-login successful!");
+            const newCookies = await page.cookies();
+            mydataSession.saveCookies(newCookies);
+            justLoggedIn = true;
+          } else {
+            console.log("❌ Auto-login failed - manual login required");
+            await page.waitForNavigation({ timeout: 0, waitUntil: "networkidle2" });
+            mydataSession.saveCookies(await page.cookies());
+            justLoggedIn = true;
+          }
+        } catch (error) {
+          console.log("❌ Auto-login error - manual login required");
+          await page.waitForNavigation({ timeout: 0, waitUntil: "networkidle2" });
+          mydataSession.saveCookies(await page.cookies());
+          justLoggedIn = true;
+        }
+      } else {
+        console.log("👤 Please login manually...");
+        await page.waitForNavigation({ timeout: 0, waitUntil: "networkidle2" });
+        mydataSession.saveCookies(await page.cookies());
+        justLoggedIn = true;
+      }
+    } else {
+      console.log("✅ Already logged in");
+    }
+
+    if (justLoggedIn && process.env.SHOW_BROWSER !== 'false') {
+      console.log("🔄 Switching to headless...");
+      await browser.close();
+      
+      browser = await puppeteer.launch({
+        headless: true,
+        userDataDir: profileDir,
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+      });
+      
+      page = (await browser.pages())[0] || (await browser.newPage());
+      await page.setViewport({ width: 1280, height: 800 });
+      
+      const freshCookies = mydataSession.loadCookies();
+      if (freshCookies) await page.setCookie(...freshCookies);
+      
+      await page.goto("https://www.mydata-ssm.com.my/home", { waitUntil: "networkidle2" });
+      isHeadless = true;
+      console.log("✅ Now headless");
+      await delay(2000);
+    }
+
+    await page.goto("https://www.mydata-ssm.com.my/home", { waitUntil: "networkidle2" });
+    await delay(3000);
+
+    // === SELECT "COMPANY" FILTER ===
+    console.log("🔽 Opening entity type filter...");
+    try {
+      // Click the dropdown button using the ID
+      const dropdownSelectors = [
+        'button#dropdownMenu1',
+        'button[id="dropdownMenu1"]',
+        'button.dropdown-toggle:has-text("All Entities")',
+        'button[data-toggle="dropdown"]'
+      ];
+      
+      let dropdownClicked = false;
+      for (const selector of dropdownSelectors) {
+        try {
+          await page.waitForSelector(selector, { timeout: 3000 });
+          await page.click(selector);
+          dropdownClicked = true;
+          console.log("✅ Dropdown opened");
+          break;
+        } catch {}
+      }
+      
+      if (!dropdownClicked) {
+        // Fallback: click by button text
+        dropdownClicked = await page.evaluate(() => {
+          const button = document.getElementById('dropdownMenu1');
+          if (button) {
+            button.click();
+            return true;
+          }
+          return false;
+        });
+        if (dropdownClicked) console.log("✅ Dropdown opened (via ID)");
+      }
+      
+      if (dropdownClicked) {
+        await delay(1500);
+        
+        // Click "Company" option from dropdown menu
+        console.log("🏢 Selecting 'Company' filter...");
+        const optionClicked = await page.evaluate(() => {
+          // Look for dropdown menu items
+          const menuItems = Array.from(document.querySelectorAll('a.dropdown-item, li a, .dropdown-menu a, button'));
+          const companyOption = menuItems.find(el => {
+            const text = el.textContent.trim();
+            return text === 'Company';
+          });
+          
+          if (companyOption) {
+            companyOption.click();
+            return true;
+          }
+          return false;
+        });
+        
+        if (optionClicked) {
+          console.log("✅ 'Company' filter selected");
+          await delay(2000);
+        } else {
+          console.log("⚠️ Could not find Company option");
+        }
+      } else {
+        console.log("⚠️ Could not open dropdown, proceeding with All Entities");
+      }
+    } catch (error) {
+      console.log("⚠️ Filter selection error:", error.message);
+    }
+
+    // === SEARCH FOR COMPANY ===
+    const searchSelectors = [
+      'input[placeholder*="search" i]',
+      'input[name*="search"]',
+      'input[type="text"]'
+    ];
+    
+    let searchBox = null;
+    for (const sel of searchSelectors) {
+      try {
+        await page.waitForSelector(sel, { visible: true, timeout: 5000 });
+        searchBox = sel;
+        break;
+      } catch {}
+    }
+    
+    if (!searchBox) throw new Error("Search box not found");
+
+    console.log(`🔍 Searching: ${companyName} (Company types only)`);
+    await page.click(searchBox, { clickCount: 3 });
+    await page.type(searchBox, companyName, { delay: 100 });
+    await page.keyboard.press("Enter");
+
+    console.log("⏳ Waiting for results...");
+    await delay(3000);
+    
+    for (let i = 0; i < 20; i++) {
+      const hasResults = await page.evaluate(() => 
+        document.body.innerText.includes('entities found') || 
+        document.body.innerText.includes('entity found')
+      );
+      
+      if (hasResults) {
+        console.log("✅ Results loaded");
+        break;
+      }
+      await delay(1000);
+    }
+    
+    await delay(2000);
+
+    // === EXTRACT ALL RESULTS WITH PAGINATION ===
+    console.log("📋 Extracting Company data with pagination...");
+    let allCompanies = [];
+    let currentPage = 1;
+    
+    while (true) {
+      console.log(`📄 Processing page ${currentPage}...`);
+      
+      // Extract companies from current page
+      const pageResults = await page.evaluate(() => {
+        const bodyText = document.body.innerText;
+        const lines = bodyText.split('\n').map(l => l.trim()).filter(l => l);
+        const typeIndex = lines.findIndex(l => l === 'Type');
+        const companies = [];
+        
+        if (typeIndex > 0) {
+          let i = typeIndex + 1;
+          let attempts = 0;
+          
+          while (i < lines.length && attempts < 300) {
+            const number = lines[i];
+            const name = lines[i + 1];
+            const type = lines[i + 2];
+            
+            if (number && name && type && 
+                number.match(/^\d{12,}/) &&
+                name.length > 3 && 
+                !name.includes('entities found') &&
+                !name.includes('Number') &&
+                !name.includes('Name') &&
+                type.length > 2 &&
+                type !== 'Type') {
+              companies.push({ number, name, type });
+              i += 3;
+            } else {
+              if (companies.length > 0 && attempts > 10) break;
+              i++;
+            }
+            attempts++;
+          }
+        }
+        
+        return companies;
+      });
+      
+      console.log(`  ✅ Found ${pageResults.length} companies on page ${currentPage}`);
+      
+      // Add all companies from this page
+      allCompanies = allCompanies.concat(pageResults);
+      
+      // Check pagination info
+      const paginationInfo = await page.evaluate(() => {
+        const el = document.querySelector(".mat-paginator-range-label");
+        if (!el) return null;
+        const text = el.textContent.trim();
+        const match = text.match(/(\d+)\s*-\s*(\d+)\s*of\s*(\d+)/i);
+        if (!match) return null;
+        const start = parseInt(match[1]);
+        const end = parseInt(match[2]);
+        const total = parseInt(match[3]);
+        return { start, end, total };
+      });
+
+      if (paginationInfo) {
+        console.log(`📊 Showing ${paginationInfo.start}-${paginationInfo.end} of ${paginationInfo.total}`);
+        
+        // Check if we've reached the end (showing last item)
+        if (paginationInfo.end >= paginationInfo.total) {
+          console.log("📌 Reached the last page (end >= total)");
+          break;
+        }
+      }
+      
+      // Store current pagination state to detect if page actually changed
+      const currentPaginationState = paginationInfo ? `${paginationInfo.start}-${paginationInfo.end}` : null;
+      
+      // Check if next page button exists and is clickable
+      const nextPageResult = await page.evaluate(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        
+        let nextButton = buttons.find(btn => {
+          if (btn.disabled) return false;
+          
+          const ariaLabel = (btn.getAttribute('aria-label') || '').toLowerCase();
+          const title = (btn.getAttribute('title') || '').toLowerCase();
+          
+          if (ariaLabel.includes('next page') || title.includes('next page')) {
+            return true;
+          }
+          
+          const svg = btn.querySelector('svg');
+          if (svg) {
+            const paths = svg.querySelectorAll('path');
+            const hasRightArrow = Array.from(paths).some(path => {
+              const d = path.getAttribute('d');
+              return d && d.includes('M9 5l7 7-7 7');
+            });
+            if (hasRightArrow) return true;
+          }
+          
+          return false;
+        });
+        
+        if (!nextButton) {
+          const allButtons = Array.from(document.querySelectorAll('button, a'));
+          const paginationButtons = allButtons.filter(btn => {
+            const text = btn.textContent.trim();
+            return /^\d+$/.test(text) || btn.querySelector('svg');
+          });
+          
+          if (paginationButtons.length > 0) {
+            nextButton = paginationButtons[paginationButtons.length - 1];
+            if (nextButton.disabled || nextButton.classList.contains('disabled')) {
+              return { success: false, disabled: true };
+            }
+          }
+        }
+        
+        if (nextButton) {
+          nextButton.click();
+          return { success: true, disabled: false };
+        }
+        
+        return { success: false, disabled: true };
+      });
+      
+      if (!nextPageResult.success) {
+        console.log("📌 No more pages (next button not found or disabled)");
+        break;
+      }
+      
+      // Wait for next page to load
+      await delay(4000);
+      
+      // Verify that pagination actually changed
+      let pageChanged = false;
+      for (let i = 0; i < 15; i++) {
+        const newPaginationState = await page.evaluate(() => {
+          const el = document.querySelector(".mat-paginator-range-label");
+          if (!el) return null;
+          const text = el.textContent.trim();
+          const match = text.match(/(\d+)\s*-\s*(\d+)\s*of\s*(\d+)/i);
+          if (!match) return null;
+          return `${match[1]}-${match[2]}`;
+        });
+        
+        // Check if pagination text changed
+        if (newPaginationState && newPaginationState !== currentPaginationState) {
+          console.log(`  ✅ Page changed: ${currentPaginationState} → ${newPaginationState}`);
+          pageChanged = true;
+          break;
+        }
+        await delay(500);
+      }
+      
+      if (!pageChanged) {
+        console.log("⚠️ Pagination didn't change - stopping (likely at last page)");
+        break;
+      }
+      
+      currentPage++;
+      
+      // Safety limit
+      if (currentPage > 100) {
+        console.log("⚠️ Reached safety limit (100 pages)");
+        break;
+      }
+    }
+
+    console.log(`✅ Total companies found: ${allCompanies.length} across ${currentPage} page(s)`);
+    console.log(`🏢 Filter applied: Company types only (SDN BHD, BHD)`);
+
+    await browser.close();
+    console.log("🔒 Browser closed\n");
+
+    return {
+      exists: allCompanies.length > 0,
+      results: allCompanies.length > 0 ? allCompanies : [{ message: "No companies found" }],
+      totalPages: currentPage,
+      filter: "Company types only (SDN BHD, BHD)"
+    };
+
+  } catch (error) {
+    console.error("❌ Error:", error.message);
+    if (browser) await browser.close();
+    throw new Error("MyData check failed: " + error.message);
+  }
+}
+
+// --- SSM Placeholder ---
+async function checkSSM(companyName) {
+  return { exists: false, results: [{ message: "SSM not implemented" }] };
+}
+
+app.listen(PORT, () => {
+  console.log(`\n✅ Server: http://localhost:${PORT}`);
+  console.log(`📂 Open: http://localhost:${PORT}/index.html\n`);
+});

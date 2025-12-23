@@ -1,0 +1,1878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Company Name Search</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+/* ===== PHONE INPUT CUSTOMIZATION ===== */
+
+/* 1. Phone Wrapper Container */
+.company-search-form .input-wrapper#phoneWrapper {
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 !important;
+    
+    /* CHANGED: From white to #fafafa to match other inputs */
+    background: #fafafa !important; 
+    
+    position: relative;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Ensure it turns WHITE when you click inside (Focus State) */
+.company-search-form .input-wrapper#phoneWrapper:focus-within {
+    border-color: #6e00c9 !important;
+    
+    /* Keep this white so it lights up when typing */
+    background: white !important; 
+    
+    box-shadow: 0 0 0 3px rgba(110, 0, 201, 0.1) !important;
+}
+
+/* ADDED: Error State (Turns red on error) */
+.company-search-form .has-error .input-wrapper#phoneWrapper {
+    border-color: #ff6b6b !important;
+    background-color: #fff5f5 !important;
+}
+
+/* 2. Country Selector */
+.company-search-form .country-selector {
+    position: relative;
+    height: 100%;
+    width: 90px; 
+    flex-shrink: 0;
+    /* The divider line inside the border */
+    border-right: 1px solid #e0e0e0; 
+}
+
+.company-search-form .country-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    height: 56px;
+    padding: 0 4px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #2c3e50;
+    font-family: inherit;
+    outline: none;
+}
+
+.company-search-form .country-button:hover {
+    background-color: #f8f9fa;
+    /* Round the left corners only so it fits in the wrapper */
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+}
+
+.company-search-form .flag { font-size: 18px; line-height: 1; }
+.company-search-form .dial-code { font-weight: 600; font-size: 14px; color: #5a6c7d; }
+.company-search-form .chevron { width: 10px; height: 10px; color: #95a5a6; transition: transform 0.2s; }
+.company-search-form .chevron.open { transform: rotate(180deg); }
+
+/* 3. Phone Input Field */
+.company-search-form #phone {
+    flex: 1;
+    border: none !important;
+    background: transparent !important;
+    height: 100%;
+    
+    /* Keep text pushed down so cursor sits at the bottom */
+    padding-top: 28px !important;
+    padding-bottom: 10px !important;
+    padding-right: 16px !important;
+    padding-left: 12px !important; 
+    
+    font-size: 15px !important;
+    color: #2c3e50 !important;
+    font-weight: 500 !important;
+}
+
+.company-search-form #phone:focus {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* 4. The Label: DEFAULT STATE (MIDDLE) */
+/* Sits in the middle like a placeholder */
+.company-search-form #phoneWrapper::before {
+    content: attr(data-label);
+    position: absolute;
+    
+    /* Position: Left = Selector Width (90px) + Input Padding (12px) */
+    left: 102px; 
+    
+    /* CENTERED VERTICALLY */
+    top: 50%; 
+    transform: translateY(-50%);
+    
+    font-size: 15px; /* Same size as input text */
+    color: #7f8c8d;
+    pointer-events: none;
+    z-index: 2;
+    font-weight: 400;
+    transition: all 0.2s ease;
+}
+
+/* 5. The Label: ACTIVE STATE (FLOATING UP) */
+/* Moves up when: 
+   1. Wrapper does NOT have .empty class (user typed something)
+   2. OR User is clicking/focusing inside the wrapper
+*/
+.company-search-form .input-wrapper:not(.empty)#phoneWrapper::before,
+.company-search-form .input-wrapper#phoneWrapper:focus-within::before {
+    top: 10px !important; 
+    transform: none;      
+    font-size: 12px;
+    font-weight: 500;
+    color: #7f8c8d;
+}
+
+/* 6. Dropdown Menu */
+.company-search-form .dropdown {
+    position: absolute;
+    /* UPDATED: Increased from 4px to 12px to clear the blue focus border */
+    top: calc(100% + 12px) !important; 
+    
+    left: 0;
+    width: 250px; 
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    display: none;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.company-search-form .dropdown.open { display: block; animation: slideDown 0.2s ease; }
+
+@keyframes slideDown { 
+    from { opacity: 0; transform: translateY(-10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+.company-search-form .search-wrapper { 
+    padding: 5px; /* Tight padding around the box */
+    border-bottom: 1px solid #f0f0f0; 
+    background: white; 
+}
+
+.company-search-form .search-input {
+    height: 30px !important;
+    line-height: 30px !important; /* MUST equal height */
+    padding: 0 8px !important;
+}
+
+.company-search-form .search-input:focus {
+    border-color: #6e00c9 !important;
+    outline: none !important;
+}
+
+.company-search-form input::placeholder {
+    font-size: 11px !important; /* Smaller placeholder text */
+    color: #95a5a6 !important;
+}
+
+.company-search-form .country-list { 
+    /* CHANGED: Reduced from 200px to 130px to keep it short */
+    max-height: 130px !important; 
+    
+    overflow-y: auto; 
+}
+
+.company-search-form .country-option { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 8px 12px; 
+    cursor: pointer; 
+    transition: background 0.1s; 
+    width: 100%; 
+    border: none; 
+    background: white; 
+    text-align: left; 
+}
+
+.company-search-form .country-option:hover { background: #f0f7ff; }
+.company-search-form .country-info { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+.company-search-form .country-name { font-size: 13px; color: #2c3e50; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.company-search-form .check-icon { color: #6e00c9; font-size: 12px; }
+.company-search-form .country-list::-webkit-scrollbar { width: 4px; }
+.company-search-form .country-list::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 2px; }
+
+/* ===== BASE STYLES ===== */
+
+.company-search-form * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.company-search-form {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #f8f9fa;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.company-search-form .container {
+    width: 100% !important;
+    max-width: 800px !important;
+    background: white !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+    overflow: hidden !important;
+}
+
+.company-search-form .header {
+    background: white !important;
+    padding: 32px 40px 24px !important;
+    border-bottom: 1px solid #e8e8e8 !important;
+    text-align: center;
+}
+
+.company-search-form .header h1 {
+    font-size: 24px !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    letter-spacing: -0.3px !important;
+    margin: 0 !important;
+}
+
+.company-search-form .content {
+    padding: 32px 40px 40px !important;
+}
+
+.company-search-form .page-indicator {
+    display: flex !important;
+    align-items: center !important;
+    gap: 16px !important;
+    margin-bottom: 32px !important;
+}
+
+.company-search-form .progress-circle {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+}
+
+.company-search-form .progress-circle svg {
+    transform: rotate(-90deg);
+}
+
+.company-search-form .progress-circle-bg {
+    fill: none;
+    stroke: #e8e8e8;
+    stroke-width: 4;
+}
+
+.company-search-form .progress-circle-fill {
+    fill: none;
+    stroke: #6e00c9;
+    stroke-width: 4;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.4s ease;
+}
+
+.company-search-form .progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+.company-search-form .page-title {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+}
+
+.company-search-form .form-section {
+    display: none !important;
+}
+
+.company-search-form .form-section.active {
+    display: block !important;
+}
+
+.company-search-form .form-group {
+    margin-bottom: 24px !important;
+    position: relative;
+}
+
+.company-search-form .error-tooltip {
+    display: none;
+    background-color: #ff6b6b !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 6px !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    margin-top: 10px !important;
+    position: relative;
+    width: fit-content;
+    animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.25) !important;
+}
+
+.company-search-form .error-tooltip::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 20px;
+    border-width: 0 6px 6px 6px;
+    border-style: solid;
+    border-color: transparent transparent #ff6b6b transparent;
+}
+
+.company-search-form .has-error .error-tooltip {
+    display: block !important;
+}
+
+.company-search-form .has-error .input-wrapper input,
+.company-search-form .has-error .input-wrapper .suffix-wrapper input {
+    border-color: #ff6b6b !important;
+    background-color: #fff5f5 !important;
+}
+
+.company-search-form .has-error .checkbox-group {
+    border-color: #ff6b6b !important;
+    background-color: #fff5f5 !important;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+    20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.company-search-form .suffix-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.company-search-form .input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.company-search-form .input-wrapper input {
+    width: 100% !important;
+    padding: 28px 16px 10px 16px !important;
+    font-size: 15px !important;
+    background: #fafafa !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    font-family: inherit !important;
+    color: #2c3e50 !important;
+    font-weight: 500 !important;
+}
+
+.company-search-form .input-wrapper .suffix-wrapper input {
+    padding-right: 100px !important;
+}
+
+.company-search-form .input-wrapper::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 16px;
+    top: 10px;
+    font-size: 12px;
+    color: #6f7c7d;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    z-index: 1;
+    font-weight: 500;
+}
+
+.company-search-form .input-wrapper.empty::before {
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 15px;
+    font-weight: 400;
+    color: #6f7c7d;
+}
+
+.company-search-form .input-wrapper.empty input {
+    padding-top: 14px !important;
+    padding-bottom: 14px !important;
+    font-weight: 400 !important;
+}
+
+.company-search-form .input-wrapper.empty .suffix-wrapper input {
+    padding-right: 100px !important;
+}
+
+.company-search-form .input-wrapper input:focus {
+    outline: none !important;
+    border-color: #6e00c9 !important;
+    background: white !important;
+    box-shadow: 0 0 0 3px rgba(110, 0, 201, 0.1) !important;
+}
+
+.company-search-form .suffix-text {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6f7c7d;
+    font-size: 13px;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.company-search-form input::placeholder {
+    color: transparent !important;
+}
+
+.company-search-form select {
+    width: 100% !important;
+    padding: 14px 16px !important;
+    font-size: 15px !important;
+    background: #fafafa !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    font-family: inherit !important;
+    color: #95a5a6 !important;
+    font-weight: 400 !important;
+}
+
+.company-search-form select:not([value=""]) {
+    color: #2c3e50 !important;
+    font-weight: 500 !important;
+}
+
+.company-search-form select option {
+    color: #2c3e50 !important;
+}
+
+.company-search-form select option:disabled {
+    color: #95a5a6 !important;
+}
+
+.company-search-form select:focus {
+    outline: none !important;
+    border-color: #6e00c9 !important;
+    background: white !important;
+    box-shadow: 0 0 0 3px rgba(110, 0, 201, 0.1) !important;
+}
+
+.company-search-form .select-wrapper {
+    position: relative;
+}
+
+.company-search-form .select-wrapper select {
+    cursor: pointer !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%237f8c8d' d='M6 8L0 0h12z'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 16px center !important;
+    padding-right: 70px !important;
+    padding-top: 28px !important;
+    padding-bottom: 10px !important;
+    font-weight: 500 !important;
+    color: #2c3e50 !important;
+}
+
+.company-search-form .select-wrapper::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 16px;
+    top: 10px;
+    font-size: 12px;
+    color: #6f7c7d;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.company-search-form .select-wrapper.empty::before {
+    display: none;
+}
+
+.company-search-form .select-wrapper.empty select {
+    padding-top: 14px !important;
+    padding-bottom: 14px !important;
+    font-weight: 400 !important;
+    color: #6f7c7d !important;
+}
+
+.company-search-form .clear-select {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border: none !important;
+    background: #e0e0e0 !important;
+    color: #6f7c7d !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    font-size: 16px !important;
+    line-height: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+}
+
+.company-search-form .clear-select:hover {
+    background: #c8c8c8 !important;
+    color: #2c3e50 !important;
+}
+
+.company-search-form .checkbox-group {
+    display: flex !important;
+    align-items: start !important;
+    gap: 12px !important;
+    padding: 16px !important;
+    background: #f8f9fa !important;
+    border-radius: 6px !important;
+    border: 1px solid #e8e8e8 !important;
+    transition: all 0.2s ease !important;
+}
+
+.company-search-form .checkbox-group input[type="checkbox"] {
+    width: 18px !important;
+    height: 18px !important;
+    margin-top: 2px !important;
+    cursor: pointer !important;
+    accent-color: #6e00c9 !important;
+    flex-shrink: 0 !important;
+}
+
+.company-search-form .checkbox-group label {
+    font-size: 14px !important;
+    color: #5a6c7d !important;
+    line-height: 1.6 !important;
+    font-weight: 400 !important;
+}
+
+.company-search-form .checkbox-group a {
+    color: #6e00c9 !important;
+    text-decoration: none !important;
+    font-weight: 500 !important;
+}
+
+.company-search-form .checkbox-group a:hover {
+    text-decoration: underline !important;
+}
+
+.company-search-form .btn {
+    width: 100% !important;
+    padding: 16px 24px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    font-family: inherit !important;
+}
+
+.company-search-form .btn-primary {
+    background: #6e00c9 !important;
+    color: white !important;
+    box-shadow: 0 2px 8px rgba(110, 0, 201, 0.2) !important;
+}
+
+.company-search-form .btn-primary:hover {
+    background: #5a00a5 !important;
+    box-shadow: 0 4px 12px rgba(110, 0, 201, 0.3) !important;
+    transform: translateY(-1px) !important;
+}
+
+.company-search-form .btn-primary:active {
+    transform: translateY(0) !important;
+}
+
+.company-search-form .btn-secondary {
+    color: #5a6c7d !important;
+    background: white !important;
+    border: 2px solid #e0e0e0 !important;
+    box-shadow: none !important;
+}
+
+.company-search-form .btn-secondary:hover {
+    background: #f8f9fa !important;
+    border-color: #c8c8c8 !important;
+}
+
+.company-search-form .btn-group {
+    display: flex !important;
+    gap: 16px !important;
+    margin-top: 32px !important;
+}
+
+.company-search-form .btn-group .btn {
+    flex: 1 !important;
+}
+
+.company-search-form .results-section {
+    display: none !important;
+}
+
+.company-search-form .results-section.active {
+    display: block !important;
+}
+
+.company-search-form .error-section {
+    display: none !important;
+}
+
+.company-search-form .error-section.active {
+    display: block !important;
+}
+
+.company-search-form .error-container {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 40px 20px !important;
+    text-align: center !important;
+    max-width: 500px !important;
+    margin: 0 auto !important;
+}
+
+.company-search-form .error-icon {
+    font-size: 48px !important;
+    color: #c62828 !important;
+    margin-bottom: 16px !important;
+}
+
+.company-search-form .error-title {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    margin-bottom: 10px !important;
+}
+
+.company-search-form .error-message {
+    font-size: 14px !important;
+    color: #5a6c7d !important;
+    line-height: 1.5 !important;
+    margin-bottom: 24px !important;
+    max-width: 380px !important;
+}
+
+.company-search-form .results-title {
+    font-size: 22px !important;
+    font-weight: 600 !important;
+    color: #2c3e50 !important;
+    margin-bottom: 24px !important;
+}
+
+.company-search-form .result-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 16px 18px !important;
+    margin-bottom: 12px !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+    font-weight: 500 !important;
+    border: 1px solid !important;
+}
+
+.company-search-form .result-available {
+    background: #e8f5e9 !important;
+    color: #2e7d32 !important;
+    border-color: #a5d6a7 !important;
+}
+
+.company-search-form .result-unavailable {
+    background: #ffebee !important;
+    color: #c62828 !important;
+    border-color: #ef9a9a !important;
+}
+
+.company-search-form .result-icon {
+    font-size: 22px !important;
+    font-weight: bold !important;
+}
+
+.company-search-form .info-box {
+    margin-top: 28px !important;
+    padding: 20px !important;
+    background: #e3f2fd !important;
+    border-radius: 8px !important;
+    border: 1px solid #90caf9 !important;
+}
+
+.company-search-form .info-box p {
+    font-size: 14px !important;
+    color: #1565c0 !important;
+    line-height: 1.7 !important;
+    font-weight: 400 !important;
+}
+
+.company-search-form .progress-bar {
+    height: 4px !important;
+    background: #e8e8e8 !important;
+}
+
+.company-search-form .progress-bar-fill {
+    height: 100% !important;
+    background: linear-gradient(90deg, #6e00c9 0%, #9c27b0 100%) !important;
+    transition: width 0.4s ease !important;
+}
+
+.company-search-form .loading {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+    padding: 0 !important;
+    width: 100% !important;
+}
+
+.company-search-form .loading-spinner {
+    width: 16px !important;
+    height: 16px !important;
+    border: 2px solid #e8e8e8 !important;
+    border-top: 2px solid #6e00c9 !important;
+    border-radius: 50% !important;
+    animation: spin 0.8s linear infinite !important;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.company-search-form .loading-progress-list {
+    width: 100% !important;
+    text-align: left !important;
+}
+
+.company-search-form .loading-progress-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 16px 18px !important;
+    margin-bottom: 12px !important;
+    border-radius: 8px !important;
+    font-size: 15px !important;
+    color: #2c3e50 !important;
+    font-weight: 500 !important;
+    border: 1px solid !important;
+    background: #f8f9fa !important;
+    border-color: #e8e8e8 !important;
+}
+
+.company-search-form .loading-progress-item.completed {
+    color: #2e7d32 !important;
+    background: #e8f5e9 !important;
+    border-color: #a5d6a7 !important;
+}
+
+.company-search-form .loading-progress-item.pending {
+    color: #95a5a6 !important;
+}
+
+.company-search-form .loading-progress-item.active {
+    color: #6e00c9 !important;
+    background: #f3e5f5 !important;
+    border-color: #ce93d8 !important;
+}
+
+.company-search-form .loading-progress-icon {
+    width: 20px !important;
+    height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    font-size: 12px !important;
+    flex-shrink: 0 !important;
+}
+
+.company-search-form .loading-progress-item.completed .loading-progress-icon {
+    background: #2e7d32 !important;
+    color: white !important;
+}
+
+.company-search-form .loading-progress-item.pending .loading-progress-icon {
+    background: #e0e0e0 !important;
+    color: #95a5a6 !important;
+}
+
+.company-search-form .loading-progress-item.active .loading-progress-icon {
+    background: #6e00c9 !important;
+    color: white !important;
+}
+
+@media (max-width: 600px) {
+    .company-search-form .container {
+        max-width: 100% !important;
+    }
+    
+    .company-search-form .content {
+        padding: 24px 24px 32px !important;
+    }
+    
+    .company-search-form .header {
+        padding: 24px 24px 20px !important;
+    }
+    
+    .company-search-form .header h1 {
+        font-size: 20px !important;
+    }
+    
+    .company-search-form .btn-group {
+        flex-direction: column !important;
+    }
+    
+    .company-search-form .btn-group .btn {
+        width: 100% !important;
+    }
+}
+
+  </style>
+</head>
+<body>
+  <div class="company-search-form">
+  <div class="container">
+    <div class="header">
+      <h2>Free Company Name Search</h2>
+    </div>
+
+    <div class="content">
+      <!-- Progress Indicator -->
+      <div class="page-indicator">
+        <div class="progress-circle">
+          <svg width="44" height="44">
+            <circle class="progress-circle-bg" cx="22" cy="22" r="20" />
+            <circle class="progress-circle-fill" cx="22" cy="22" r="20" 
+                    stroke-dasharray="125.6" 
+                    stroke-dashoffset="125.6" 
+                    id="progressCircle" />
+          </svg>
+          <div class="progress-text" id="progressText"><strong>1</strong>/2</div>
+        </div>
+        <h3 class="page-title" id="pageTitle">Page 1</h3>
+      </div>
+
+      <!-- Page 1 -->
+      <div class="form-section active" id="page1">
+        
+        <!-- Company Name 1 (Required) -->
+        <div class="form-group">
+          <div class="input-wrapper empty" id="companyName1Wrapper" data-label="Company Name 1">
+            <div class="suffix-wrapper">
+              <input type="text" id="companyName1" required>
+              <span class="suffix-text">SDN BHD</span>
+            </div>
+          </div>
+          <div class="error-tooltip" id="errorMsg1">
+            <i class="fas fa-exclamation-triangle"></i> Field is required
+          </div>
+        </div>
+
+        <!-- Company Name 2 -->
+        <div class="form-group">
+          <div class="input-wrapper empty" id="companyName2Wrapper" data-label="Company Name 2">
+            <div class="suffix-wrapper">
+              <input type="text" id="companyName2">
+              <span class="suffix-text">SDN BHD</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Company Name 3 -->
+        <div class="form-group">
+          <div class="input-wrapper empty" id="companyName3Wrapper" data-label="Company Name 3">
+            <div class="suffix-wrapper">
+              <input type="text" id="companyName3">
+              <span class="suffix-text">SDN BHD</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dropdown -->
+        <div class="form-group">
+          <div class="select-wrapper empty" id="selectWrapper" data-label="When do you plan to incorporate your company?">
+            <select id="incorporationDate">
+              <option value="" disabled selected>When do you plan to incorporate your company?</option>
+              <option value="now">Now</option>
+              <option value="next-1-month">Next 1 month</option>
+              <option value="next-3-6-month">Next 3-6 month</option>
+              <option value="not-sure">Not sure</option>
+            </select>
+            <button type="button" class="clear-select" id="clearIncorporation" style="display: none;" onclick="clearSelect()">×</button>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="goToPage2()" id="nextBtn">Next</button>
+      </div>
+
+      <!-- Page 2 -->
+      <div class="form-section" id="page2">
+        <div class="form-group">
+          <div class="input-wrapper empty" id="nameWrapper" data-label="Name">
+            <input type="text" id="name" required>
+          </div>
+          <div class="error-tooltip" id="errorMsgName">
+            <i class="fas fa-exclamation-triangle"></i> Field is required
+          </div>
+        </div>
+        <div class="form-group">
+          <div class="input-wrapper empty" id="emailWrapper" data-label="E-mail">
+            <input type="email" id="email" required>
+          </div>
+          <div class="error-tooltip" id="errorMsgEmail">
+            <i class="fas fa-exclamation-triangle"></i> Must be valid email
+          </div>
+        </div>
+        <div class="form-group">
+  <div class="input-wrapper empty" id="phoneWrapper" data-label="Phone Number">
+    
+    <!-- Custom Country Selector -->
+    <div class="country-selector">
+      <button type="button" class="country-button" id="countryButton">
+        <span class="flag" id="selectedFlag">🇲🇾</span>
+        <span class="dial-code" id="selectedDialCode">+60</span>
+        <svg class="chevron" id="chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+        </svg>
+      </button>
+
+      <!-- Dropdown Menu -->
+      <div class="dropdown" id="dropdown">
+        <div class="search-wrapper">
+          <input type="text" class="search-input" id="countrySearch" placeholder="Search country...">
+        </div>
+        <div class="country-list" id="countryList">
+          <!-- List items injected via JS -->
+        </div>
+      </div>
+    </div>
+    <!-- End Selector -->
+
+    <input type="tel" id="phone" required>
+  </div>
+  
+  <div class="error-tooltip" id="errorMsgPhone">
+    <i class="fas fa-exclamation-triangle"></i> Invalid phone number
+  </div>
+</div>
+        <div class="form-group">
+          <div class="checkbox-group">
+            <input type="checkbox" id="terms" required>
+            <label for="terms">
+              By clicking Submit, I confirm the info is correct and accept the terms of service. 
+              <a href="#" onclick="return false;">Click here for terms of service.</a>
+            </label>
+          </div>
+          <div class="error-tooltip" id="errorMsgTerms">
+            <i class="fas fa-exclamation-triangle"></i> You must accept the terms of service
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary" onclick="goToPage1()">Back</button>
+          <button class="btn btn-primary" onclick="submitForm()" id="submitBtn">Submit Form</button>
+        </div>
+      </div>
+      
+      <!-- Loading -->
+      <div class="form-section" id="loading">
+        <div class="loading">
+          <div class="loading-progress-list" id="loadingProgressList"></div>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-section" id="error">
+        <div class="error-container">
+          <div class="error-icon">
+            <i class="fas fa-exclamation-circle"></i>
+          </div>
+          <h3 class="error-title">Something Went Wrong</h3>
+          <p class="error-message">We encountered an error while checking your company names. Please try again or contact support if the problem persists.</p>
+          <div class="btn-group" style="max-width: 200px; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-secondary" onclick="goBackFromError()" style="flex: 0 0 auto; width: 80px;">Back</button>
+            <button class="btn btn-primary" onclick="retrySubmit()" style="flex: 0   0 auto; width: 80px;">Try Again</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="results-section" id="results">
+        <h3 class="results-title">Name Availability Results</h3>
+        <div id="resultsContainer"></div>
+        <div class="info-box">
+          <p>Your information has been submitted successfully. Our team will contact you soon at <strong id="contactEmail"></strong> or <strong id="contactPhone"></strong>.</p>
+        </div>
+        <button class="btn btn-primary" onclick="resetForm()" style="margin-top: 30px;">Check Another Name</button>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar">
+      <div class="progress-bar-fill" id="progressBar" style="width: 50%;"></div>
+    </div>
+  </div>
+
+  <script>
+   // --- 1. DEFINE COUNTRIES DATA ---
+const countries = [
+    { code: 'AF', name: 'Afghanistan', dialCode: '+93', flag: '🇦🇫' },
+    { code: 'AL', name: 'Albania', dialCode: '+355', flag: '🇦🇱' },
+    { code: 'DZ', name: 'Algeria', dialCode: '+213', flag: '🇩🇿' },
+    { code: 'AS', name: 'American Samoa', dialCode: '+1684', flag: '🇦🇸' },
+    { code: 'AD', name: 'Andorra', dialCode: '+376', flag: '🇦🇩' },
+    { code: 'AO', name: 'Angola', dialCode: '+244', flag: '🇦🇴' },
+    { code: 'AI', name: 'Anguilla', dialCode: '+1264', flag: '🇦🇮' },
+    { code: 'AG', name: 'Antigua and Barbuda', dialCode: '+1268', flag: '🇦🇬' },
+    { code: 'AR', name: 'Argentina', dialCode: '+54', flag: '🇦🇷' },
+    { code: 'AM', name: 'Armenia', dialCode: '+374', flag: '🇦🇲' },
+    { code: 'AW', name: 'Aruba', dialCode: '+297', flag: '🇦🇼' },
+    { code: 'AU', name: 'Australia', dialCode: '+61', flag: '🇦🇺' },
+    { code: 'AT', name: 'Austria', dialCode: '+43', flag: '🇦🇹' },
+    { code: 'AZ', name: 'Azerbaijan', dialCode: '+994', flag: '🇦🇿' },
+    { code: 'BS', name: 'Bahamas', dialCode: '+1242', flag: '🇧🇸' },
+    { code: 'BH', name: 'Bahrain', dialCode: '+973', flag: '🇧🇭' },
+    { code: 'BD', name: 'Bangladesh', dialCode: '+880', flag: '🇧🇩' },
+    { code: 'BB', name: 'Barbados', dialCode: '+1246', flag: '🇧🇧' },
+    { code: 'BY', name: 'Belarus', dialCode: '+375', flag: '🇧🇾' },
+    { code: 'BE', name: 'Belgium', dialCode: '+32', flag: '🇧🇪' },
+    { code: 'BZ', name: 'Belize', dialCode: '+501', flag: '🇧🇿' },
+    { code: 'BJ', name: 'Benin', dialCode: '+229', flag: '🇧🇯' },
+    { code: 'BM', name: 'Bermuda', dialCode: '+1441', flag: '🇧🇲' },
+    { code: 'BT', name: 'Bhutan', dialCode: '+975', flag: '🇧🇹' },
+    { code: 'BO', name: 'Bolivia', dialCode: '+591', flag: '🇧🇴' },
+    { code: 'BA', name: 'Bosnia and Herzegovina', dialCode: '+387', flag: '🇧🇦' },
+    { code: 'BW', name: 'Botswana', dialCode: '+267', flag: '🇧🇼' },
+    { code: 'BR', name: 'Brazil', dialCode: '+55', flag: '🇧🇷' },
+    { code: 'IO', name: 'British Indian Ocean Territory', dialCode: '+246', flag: '🇮🇴' },
+    { code: 'BN', name: 'Brunei Darussalam', dialCode: '+673', flag: '🇧🇳' },
+    { code: 'BG', name: 'Bulgaria', dialCode: '+359', flag: '🇧🇬' },
+    { code: 'BF', name: 'Burkina Faso', dialCode: '+226', flag: '🇧🇫' },
+    { code: 'BI', name: 'Burundi', dialCode: '+257', flag: '🇧🇮' },
+    { code: 'KH', name: 'Cambodia', dialCode: '+855', flag: '🇰🇭' },
+    { code: 'CM', name: 'Cameroon', dialCode: '+237', flag: '🇨🇲' },
+    { code: 'CA', name: 'Canada', dialCode: '+1', flag: '🇨🇦' },
+    { code: 'CV', name: 'Cape Verde', dialCode: '+238', flag: '🇨🇻' },
+    { code: 'KY', name: 'Cayman Islands', dialCode: '+1345', flag: '🇰🇾' },
+    { code: 'CF', name: 'Central African Republic', dialCode: '+236', flag: '🇨🇫' },
+    { code: 'TD', name: 'Chad', dialCode: '+235', flag: '🇹🇩' },
+    { code: 'CL', name: 'Chile', dialCode: '+56', flag: '🇨🇱' },
+    { code: 'CN', name: 'China', dialCode: '+86', flag: '🇨🇳' },
+    { code: 'CX', name: 'Christmas Island', dialCode: '+61', flag: '🇨🇽' },
+    { code: 'CC', name: 'Cocos (Keeling) Islands', dialCode: '+61', flag: '🇨🇨' },
+    { code: 'CO', name: 'Colombia', dialCode: '+57', flag: '🇨🇴' },
+    { code: 'KM', name: 'Comoros', dialCode: '+269', flag: '🇰🇲' },
+    { code: 'CG', name: 'Congo', dialCode: '+242', flag: '🇨🇬' },
+    { code: 'CD', name: 'Congo, Democratic Republic', dialCode: '+243', flag: '🇨🇩' },
+    { code: 'CK', name: 'Cook Islands', dialCode: '+682', flag: '🇨🇰' },
+    { code: 'CR', name: 'Costa Rica', dialCode: '+506', flag: '🇨🇷' },
+    { code: 'CI', name: 'Cote d\'Ivoire', dialCode: '+225', flag: '🇨🇮' },
+    { code: 'HR', name: 'Croatia', dialCode: '+385', flag: '🇭🇷' },
+    { code: 'CU', name: 'Cuba', dialCode: '+53', flag: '🇨🇺' },
+    { code: 'CY', name: 'Cyprus', dialCode: '+357', flag: '🇨🇾' },
+    { code: 'CZ', name: 'Czech Republic', dialCode: '+420', flag: '🇨🇿' },
+    { code: 'DK', name: 'Denmark', dialCode: '+45', flag: '🇩🇰' },
+    { code: 'DJ', name: 'Djibouti', dialCode: '+253', flag: '🇩🇯' },
+    { code: 'DM', name: 'Dominica', dialCode: '+1767', flag: '🇩🇲' },
+    { code: 'DO', name: 'Dominican Republic', dialCode: '+1849', flag: '🇩🇴' },
+    { code: 'EC', name: 'Ecuador', dialCode: '+593', flag: '🇪🇨' },
+    { code: 'EG', name: 'Egypt', dialCode: '+20', flag: '🇪🇬' },
+    { code: 'SV', name: 'El Salvador', dialCode: '+503', flag: '🇸🇻' },
+    { code: 'GQ', name: 'Equatorial Guinea', dialCode: '+240', flag: '🇬🇶' },
+    { code: 'ER', name: 'Eritrea', dialCode: '+291', flag: '🇪🇷' },
+    { code: 'EE', name: 'Estonia', dialCode: '+372', flag: '🇪🇪' },
+    { code: 'ET', name: 'Ethiopia', dialCode: '+251', flag: '🇪🇹' },
+    { code: 'FK', name: 'Falkland Islands (Malvinas)', dialCode: '+500', flag: '🇫🇰' },
+    { code: 'FO', name: 'Faroe Islands', dialCode: '+298', flag: '🇫🇴' },
+    { code: 'FJ', name: 'Fiji', dialCode: '+679', flag: '🇫🇯' },
+    { code: 'FI', name: 'Finland', dialCode: '+358', flag: '🇫🇮' },
+    { code: 'FR', name: 'France', dialCode: '+33', flag: '🇫🇷' },
+    { code: 'GF', name: 'French Guiana', dialCode: '+594', flag: '🇬🇫' },
+    { code: 'PF', name: 'French Polynesia', dialCode: '+689', flag: '🇵🇫' },
+    { code: 'GA', name: 'Gabon', dialCode: '+241', flag: '🇬🇦' },
+    { code: 'GM', name: 'Gambia', dialCode: '+220', flag: '🇬🇲' },
+    { code: 'GE', name: 'Georgia', dialCode: '+995', flag: '🇬🇪' },
+    { code: 'DE', name: 'Germany', dialCode: '+49', flag: '🇩🇪' },
+    { code: 'GH', name: 'Ghana', dialCode: '+233', flag: '🇬🇭' },
+    { code: 'GI', name: 'Gibraltar', dialCode: '+350', flag: '🇬🇮' },
+    { code: 'GR', name: 'Greece', dialCode: '+30', flag: '🇬🇷' },
+    { code: 'GL', name: 'Greenland', dialCode: '+299', flag: '🇬🇱' },
+    { code: 'GD', name: 'Grenada', dialCode: '+1473', flag: '🇬🇩' },
+    { code: 'GP', name: 'Guadeloupe', dialCode: '+590', flag: '🇬🇵' },
+    { code: 'GU', name: 'Guam', dialCode: '+1671', flag: '🇬🇺' },
+    { code: 'GT', name: 'Guatemala', dialCode: '+502', flag: '🇬🇹' },
+    { code: 'GG', name: 'Guernsey', dialCode: '+44', flag: '🇬🇬' },
+    { code: 'GN', name: 'Guinea', dialCode: '+224', flag: '🇬🇳' },
+    { code: 'GW', name: 'Guinea-Bissau', dialCode: '+245', flag: '🇬🇼' },
+    { code: 'GY', name: 'Guyana', dialCode: '+592', flag: '🇬🇾' },
+    { code: 'HT', name: 'Haiti', dialCode: '+509', flag: '🇭🇹' },
+    { code: 'VA', name: 'Holy See (Vatican City State)', dialCode: '+379', flag: '🇻🇦' },
+    { code: 'HN', name: 'Honduras', dialCode: '+504', flag: '🇭🇳' },
+    { code: 'HK', name: 'Hong Kong', dialCode: '+852', flag: '🇭🇰' },
+    { code: 'HU', name: 'Hungary', dialCode: '+36', flag: '🇭🇺' },
+    { code: 'IS', name: 'Iceland', dialCode: '+354', flag: '🇮🇸' },
+    { code: 'IN', name: 'India', dialCode: '+91', flag: '🇮🇳' },
+    { code: 'ID', name: 'Indonesia', dialCode: '+62', flag: '🇮🇩' },
+    { code: 'IR', name: 'Iran, Islamic Republic of', dialCode: '+98', flag: '🇮🇷' },
+    { code: 'IQ', name: 'Iraq', dialCode: '+964', flag: '🇮🇶' },
+    { code: 'IE', name: 'Ireland', dialCode: '+353', flag: '🇮🇪' },
+    { code: 'IM', name: 'Isle of Man', dialCode: '+44', flag: '🇮🇲' },
+    { code: 'IL', name: 'Israel', dialCode: '+972', flag: '🇮🇱' },
+    { code: 'IT', name: 'Italy', dialCode: '+39', flag: '🇮🇹' },
+    { code: 'JM', name: 'Jamaica', dialCode: '+1876', flag: '🇯🇲' },
+    { code: 'JP', name: 'Japan', dialCode: '+81', flag: '🇯🇵' },
+    { code: 'JE', name: 'Jersey', dialCode: '+44', flag: '🇯🇪' },
+    { code: 'JO', name: 'Jordan', dialCode: '+962', flag: '🇯🇴' },
+    { code: 'KZ', name: 'Kazakhstan', dialCode: '+7', flag: '🇰🇿' },
+    { code: 'KE', name: 'Kenya', dialCode: '+254', flag: '🇰🇪' },
+    { code: 'KI', name: 'Kiribati', dialCode: '+686', flag: '🇰🇮' },
+    { code: 'KP', name: 'Korea, Democratic People\'s Republic of', dialCode: '+850', flag: '🇰🇵' },
+    { code: 'KR', name: 'Korea, Republic of', dialCode: '+82', flag: '🇰🇷' },
+    { code: 'KW', name: 'Kuwait', dialCode: '+965', flag: '🇰🇼' },
+    { code: 'KG', name: 'Kyrgyzstan', dialCode: '+996', flag: '🇰🇬' },
+    { code: 'LA', name: 'Lao People\'s Democratic Republic', dialCode: '+856', flag: '🇱🇦' },
+    { code: 'LV', name: 'Latvia', dialCode: '+371', flag: '🇱🇻' },
+    { code: 'LB', name: 'Lebanon', dialCode: '+961', flag: '🇱🇧' },
+    { code: 'LS', name: 'Lesotho', dialCode: '+266', flag: '🇱🇸' },
+    { code: 'LR', name: 'Liberia', dialCode: '+231', flag: '🇱🇷' },
+    { code: 'LY', name: 'Libyan Arab Jamahiriya', dialCode: '+218', flag: '🇱🇾' },
+    { code: 'LI', name: 'Liechtenstein', dialCode: '+423', flag: '🇱🇮' },
+    { code: 'LT', name: 'Lithuania', dialCode: '+370', flag: '🇱🇹' },
+    { code: 'LU', name: 'Luxembourg', dialCode: '+352', flag: '🇱🇺' },
+    { code: 'MO', name: 'Macao', dialCode: '+853', flag: '🇲🇴' },
+    { code: 'MK', name: 'Macedonia, The Former Yugoslav Republic of', dialCode: '+389', flag: '🇲🇰' },
+    { code: 'MG', name: 'Madagascar', dialCode: '+261', flag: '🇲🇬' },
+    { code: 'MW', name: 'Malawi', dialCode: '+265', flag: '🇲🇼' },
+    { code: 'MY', name: 'Malaysia', dialCode: '+60', flag: '🇲🇾' },
+    { code: 'MV', name: 'Maldives', dialCode: '+960', flag: '🇲🇻' },
+    { code: 'ML', name: 'Mali', dialCode: '+223', flag: '🇲🇱' },
+    { code: 'MT', name: 'Malta', dialCode: '+356', flag: '🇲🇹' },
+    { code: 'MH', name: 'Marshall Islands', dialCode: '+692', flag: '🇲🇭' },
+    { code: 'MQ', name: 'Martinique', dialCode: '+596', flag: '🇲🇶' },
+    { code: 'MR', name: 'Mauritania', dialCode: '+222', flag: '🇲🇷' },
+    { code: 'MU', name: 'Mauritius', dialCode: '+230', flag: '🇲🇺' },
+    { code: 'YT', name: 'Mayotte', dialCode: '+262', flag: '🇾🇹' },
+    { code: 'MX', name: 'Mexico', dialCode: '+52', flag: '🇲🇽' },
+    { code: 'FM', name: 'Micronesia, Federated States of', dialCode: '+691', flag: '🇫🇲' },
+    { code: 'MD', name: 'Moldova, Republic of', dialCode: '+373', flag: '🇲🇩' },
+    { code: 'MC', name: 'Monaco', dialCode: '+377', flag: '🇲🇨' },
+    { code: 'MN', name: 'Mongolia', dialCode: '+976', flag: '🇲🇳' },
+    { code: 'ME', name: 'Montenegro', dialCode: '+382', flag: '🇲🇪' },
+    { code: 'MS', name: 'Montserrat', dialCode: '+1664', flag: '🇲🇸' },
+    { code: 'MA', name: 'Morocco', dialCode: '+212', flag: '🇲🇦' },
+    { code: 'MZ', name: 'Mozambique', dialCode: '+258', flag: '🇲🇿' },
+    { code: 'MM', name: 'Myanmar', dialCode: '+95', flag: '🇲🇲' },
+    { code: 'NA', name: 'Namibia', dialCode: '+264', flag: '🇳🇦' },
+    { code: 'NR', name: 'Nauru', dialCode: '+674', flag: '🇳🇷' },
+    { code: 'NP', name: 'Nepal', dialCode: '+977', flag: '🇳🇵' },
+    { code: 'NL', name: 'Netherlands', dialCode: '+31', flag: '🇳🇱' },
+    { code: 'NC', name: 'New Caledonia', dialCode: '+687', flag: '🇳🇨' },
+    { code: 'NZ', name: 'New Zealand', dialCode: '+64', flag: '🇳🇿' },
+    { code: 'NI', name: 'Nicaragua', dialCode: '+505', flag: '🇳🇮' },
+    { code: 'NE', name: 'Niger', dialCode: '+227', flag: '🇳🇪' },
+    { code: 'NG', name: 'Nigeria', dialCode: '+234', flag: '🇳🇬' },
+    { code: 'NU', name: 'Niue', dialCode: '+683', flag: '🇳🇺' },
+    { code: 'NF', name: 'Norfolk Island', dialCode: '+672', flag: '🇳🇫' },
+    { code: 'MP', name: 'Northern Mariana Islands', dialCode: '+1670', flag: '🇲🇵' },
+    { code: 'NO', name: 'Norway', dialCode: '+47', flag: '🇳🇴' },
+    { code: 'OM', name: 'Oman', dialCode: '+968', flag: '🇴🇲' },
+    { code: 'PK', name: 'Pakistan', dialCode: '+92', flag: '🇵🇰' },
+    { code: 'PW', name: 'Palau', dialCode: '+680', flag: '🇵🇼' },
+    { code: 'PS', name: 'Palestinian Territory, Occupied', dialCode: '+970', flag: '🇵🇸' },
+    { code: 'PA', name: 'Panama', dialCode: '+507', flag: '🇵🇦' },
+    { code: 'PG', name: 'Papua New Guinea', dialCode: '+675', flag: '🇵🇬' },
+    { code: 'PY', name: 'Paraguay', dialCode: '+595', flag: '🇵🇾' },
+    { code: 'PE', name: 'Peru', dialCode: '+51', flag: '🇵🇪' },
+    { code: 'PH', name: 'Philippines', dialCode: '+63', flag: '🇵🇭' },
+    { code: 'PN', name: 'Pitcairn', dialCode: '+64', flag: '🇵🇳' },
+    { code: 'PL', name: 'Poland', dialCode: '+48', flag: '🇵🇱' },
+    { code: 'PT', name: 'Portugal', dialCode: '+351', flag: '🇵🇹' },
+    { code: 'PR', name: 'Puerto Rico', dialCode: '+1939', flag: '🇵🇷' },
+    { code: 'QA', name: 'Qatar', dialCode: '+974', flag: '🇶🇦' },
+    { code: 'RE', name: 'Reunion', dialCode: '+262', flag: '🇷🇪' },
+    { code: 'RO', name: 'Romania', dialCode: '+40', flag: '🇷🇴' },
+    { code: 'RU', name: 'Russian Federation', dialCode: '+7', flag: '🇷🇺' },
+    { code: 'RW', name: 'Rwanda', dialCode: '+250', flag: '🇷🇼' },
+    { code: 'BL', name: 'Saint Barthelemy', dialCode: '+590', flag: '🇧🇱' },
+    { code: 'SH', name: 'Saint Helena', dialCode: '+290', flag: '🇸🇭' },
+    { code: 'KN', name: 'Saint Kitts and Nevis', dialCode: '+1869', flag: '🇰🇳' },
+    { code: 'LC', name: 'Saint Lucia', dialCode: '+1758', flag: '🇱🇨' },
+    { code: 'MF', name: 'Saint Martin', dialCode: '+590', flag: '🇲🇫' },
+    { code: 'PM', name: 'Saint Pierre and Miquelon', dialCode: '+508', flag: '🇵🇲' },
+    { code: 'VC', name: 'Saint Vincent and the Grenadines', dialCode: '+1784', flag: '🇻🇨' },
+    { code: 'WS', name: 'Samoa', dialCode: '+685', flag: '🇼🇸' },
+    { code: 'SM', name: 'San Marino', dialCode: '+378', flag: '🇸🇲' },
+    { code: 'ST', name: 'Sao Tome and Principe', dialCode: '+239', flag: '🇸🇹' },
+    { code: 'SA', name: 'Saudi Arabia', dialCode: '+966', flag: '🇸🇦' },
+    { code: 'SN', name: 'Senegal', dialCode: '+221', flag: '🇸🇳' },
+    { code: 'RS', name: 'Serbia', dialCode: '+381', flag: '🇷🇸' },
+    { code: 'SC', name: 'Seychelles', dialCode: '+248', flag: '🇸🇨' },
+    { code: 'SL', name: 'Sierra Leone', dialCode: '+232', flag: '🇸🇱' },
+    { code: 'SG', name: 'Singapore', dialCode: '+65', flag: '🇸🇬' },
+    { code: 'SX', name: 'Sint Maarten (Dutch part)', dialCode: '+1721', flag: '🇸🇽' },
+    { code: 'SK', name: 'Slovakia', dialCode: '+421', flag: '🇸🇰' },
+    { code: 'SI', name: 'Slovenia', dialCode: '+386', flag: '🇸🇮' },
+    { code: 'SB', name: 'Solomon Islands', dialCode: '+677', flag: '🇸🇧' },
+    { code: 'SO', name: 'Somalia', dialCode: '+252', flag: '🇸🇴' },
+    { code: 'ZA', name: 'South Africa', dialCode: '+27', flag: '🇿🇦' },
+    { code: 'GS', name: 'South Georgia and the South Sandwich Islands', dialCode: '+500', flag: '🇬🇸' },
+    { code: 'SS', name: 'South Sudan', dialCode: '+211', flag: '🇸🇸' },
+    { code: 'ES', name: 'Spain', dialCode: '+34', flag: '🇪🇸' },
+    { code: 'LK', name: 'Sri Lanka', dialCode: '+94', flag: '🇱🇰' },
+    { code: 'SD', name: 'Sudan', dialCode: '+249', flag: '🇸🇩' },
+    { code: 'SR', name: 'Suriname', dialCode: '+597', flag: '🇸🇷' },
+    { code: 'SJ', name: 'Svalbard and Jan Mayen', dialCode: '+47', flag: '🇸🇯' },
+    { code: 'SZ', name: 'Swaziland', dialCode: '+268', flag: '🇸🇿' },
+    { code: 'SE', name: 'Sweden', dialCode: '+46', flag: '🇸🇪' },
+    { code: 'CH', name: 'Switzerland', dialCode: '+41', flag: '🇨🇭' },
+    { code: 'SY', name: 'Syrian Arab Republic', dialCode: '+963', flag: '🇸🇾' },
+    { code: 'TW', name: 'Taiwan, Province of China', dialCode: '+886', flag: '🇹🇼' },
+    { code: 'TJ', name: 'Tajikistan', dialCode: '+992', flag: '🇹🇯' },
+    { code: 'TZ', name: 'Tanzania, United Republic of', dialCode: '+255', flag: '🇹🇿' },
+    { code: 'TH', name: 'Thailand', dialCode: '+66', flag: '🇹🇭' },
+    { code: 'TL', name: 'Timor-Leste', dialCode: '+670', flag: '🇹🇱' },
+    { code: 'TG', name: 'Togo', dialCode: '+228', flag: '🇹🇬' },
+    { code: 'TK', name: 'Tokelau', dialCode: '+690', flag: '🇹🇰' },
+    { code: 'TO', name: 'Tonga', dialCode: '+676', flag: '🇹🇴' },
+    { code: 'TT', name: 'Trinidad and Tobago', dialCode: '+1868', flag: '🇹🇹' },
+    { code: 'TN', name: 'Tunisia', dialCode: '+216', flag: '🇹🇳' },
+    { code: 'TR', name: 'Turkey', dialCode: '+90', flag: '🇹🇷' },
+    { code: 'TM', name: 'Turkmenistan', dialCode: '+993', flag: '🇹🇲' },
+    { code: 'TC', name: 'Turks and Caicos Islands', dialCode: '+1649', flag: '🇹🇨' },
+    { code: 'TV', name: 'Tuvalu', dialCode: '+688', flag: '🇹🇻' },
+    { code: 'UG', name: 'Uganda', dialCode: '+256', flag: '🇺🇬' },
+    { code: 'UA', name: 'Ukraine', dialCode: '+380', flag: '🇺🇦' },
+    { code: 'AE', name: 'United Arab Emirates', dialCode: '+971', flag: '🇦🇪' },
+    { code: 'GB', name: 'United Kingdom', dialCode: '+44', flag: '🇬🇧' },
+    { code: 'US', name: 'United States', dialCode: '+1', flag: '🇺🇸' },
+    { code: 'UY', name: 'Uruguay', dialCode: '+598', flag: '🇺🇾' },
+    { code: 'UZ', name: 'Uzbekistan', dialCode: '+998', flag: '🇺🇿' },
+    { code: 'VU', name: 'Vanuatu', dialCode: '+678', flag: '🇻🇺' },
+    { code: 'VE', name: 'Venezuela', dialCode: '+58', flag: '🇻🇪' },
+    { code: 'VN', name: 'Vietnam', dialCode: '+84', flag: '🇻🇳' },
+    { code: 'VG', name: 'Virgin Islands, British', dialCode: '+1284', flag: '🇻🇬' },
+    { code: 'VI', name: 'Virgin Islands, U.S.', dialCode: '+1340', flag: '🇻🇮' },
+    { code: 'WF', name: 'Wallis and Futuna', dialCode: '+681', flag: '🇼🇫' },
+    { code: 'YE', name: 'Yemen', dialCode: '+967', flag: '🇾🇪' },
+    { code: 'ZM', name: 'Zambia', dialCode: '+260', flag: '🇿🇲' },
+    { code: 'ZW', name: 'Zimbabwe', dialCode: '+263', flag: '🇿🇼' }
+];
+
+    let selectedCountry = countries.find(c => c.code === 'MY') || countries[0];
+
+      document.addEventListener('DOMContentLoaded', function() {
+       const countryButton = document.getElementById('countryButton');
+        const dropdown = document.getElementById('dropdown');
+        const countryList = document.getElementById('countryList');
+        const searchInput = document.getElementById('countrySearch');
+        const phoneInput = document.getElementById('phone');
+
+ // Render Initial List
+        renderCountryList(countries);
+
+        // Toggle Dropdown
+        countryButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent closing immediately
+            dropdown.classList.toggle('open');
+            document.getElementById('chevron').classList.toggle('open');
+            if(dropdown.classList.contains('open')) {
+                searchInput.value = '';
+                renderCountryList(countries);
+                searchInput.focus();
+            }
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target) && !countryButton.contains(e.target)) {
+                dropdown.classList.remove('open');
+                document.getElementById('chevron').classList.remove('open');
+            }
+        });
+
+        // Search Filter
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = countries.filter(c => 
+                c.name.toLowerCase().includes(query) || 
+                c.dialCode.includes(query)
+            );
+            renderCountryList(filtered);
+        });
+
+        // Input Formatting (Simple)
+        phoneInput.addEventListener('input', function() {
+             // Remove any non-number characters for validation logic
+             // But allow user to type
+        });
+    });
+
+    // --- 3. HELPER FUNCTIONS ---
+
+    function renderCountryList(list) {
+        const container = document.getElementById('countryList');
+        if(!container) return;
+        
+        container.innerHTML = list.map(c => `
+            <button type="button" class="country-option" onclick="selectCountry('${c.code}')">
+                <div class="country-info">
+                    <span class="flag">${c.flag}</span>
+                    <span class="country-name">${c.name} (${c.dialCode})</span>
+                </div>
+                ${c.code === selectedCountry.code ? '<i class="fas fa-check check-icon"></i>' : ''}
+            </button>
+        `).join('');
+    }
+
+    function selectCountry(code) {
+        const country = countries.find(c => c.code === code);
+        if (!country) return;
+
+        selectedCountry = country;
+        
+        // Update UI
+        document.getElementById('selectedFlag').textContent = country.flag;
+        document.getElementById('selectedDialCode').textContent = country.dialCode;
+        
+        // Close Dropdown
+        document.getElementById('dropdown').classList.remove('open');
+        document.getElementById('chevron').classList.remove('open');
+        
+        // Re-render list to show checkmark on new selection
+        renderCountryList(countries);
+    }
+
+    // --- 4. UPDATE YOUR EXISTING FUNCTIONS ---
+
+    // Update validatePhone to use the selected country code
+    function validatePhone(phone) {
+        // Simple regex: 7 to 15 digits
+        const cleaned = phone.replace(/[^0-9]/g, '');
+        return cleaned.length >= 7 && cleaned.length <= 15;
+    }
+// ... [Your existing Country Dropdown Logic is above here] ...
+
+    // ==========================================
+    //  START: STRICT PHONE NUMBER LOGIC
+    // ==========================================
+    
+    const phoneInput = document.getElementById('phone');
+    const phoneWrapper = document.getElementById('phoneWrapper');
+    const errorMsg = document.getElementById('errorMsgPhone');
+
+    // --- STRATEGY 1: Block Non-Numbers on Key Press (Desktop) ---
+    phoneInput.addEventListener('keydown', function(e) {
+        // Allow: Backspace, Delete, Tab, Escape, Enter, Arrows
+        const allowedKeys = [46, 8, 9, 27, 13, 110, 190, 35, 36, 37, 38, 39, 40];
+        
+        // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+        if (allowedKeys.indexOf(e.keyCode) !== -1 || 
+           ((e.ctrlKey || e.metaKey) && /^[acvx]$/.test(e.key.toLowerCase()))) {
+          return;
+        }
+
+        // Check if key is a number (Top row 48-57 or Numpad 96-105)
+        const isNumber = (e.keyCode >= 48 && e.keyCode <= 57) || 
+                         (e.keyCode >= 96 && e.keyCode <= 105);
+
+        if (!isNumber) {
+          e.preventDefault(); // Stop the character from happening
+        }
+    });
+
+    // --- STRATEGY 2: Sanitize Input (Mobile/Paste/Drag) ---
+    phoneInput.addEventListener('input', function() {
+        // If "abc" somehow got in, replace it immediately
+        this.value = this.value.replace(/[^0-9]/g, '');
+
+        // Handle Floating Label manually since we aren't using handleInputWrapper for phone anymore
+        if (this.value.length > 0) {
+          phoneWrapper.classList.remove('empty');
+        } else {
+          phoneWrapper.classList.add('empty');
+        }
+
+        // Hide Error immediately while typing
+        if (errorMsg.style.display === 'block') {
+          errorMsg.style.display = 'none';
+          this.closest('.form-group').classList.remove('has-error');
+        }
+    });
+
+    // --- STRATEGY 3: Prevent Paste of non-numbers ---
+    phoneInput.addEventListener('paste', function(e) {
+        // Get pasted data
+        const paste = (e.clipboardData || window.clipboardData).getData('text');
+        // If paste contains anything other than digits, block it
+        if (/[^0-9]/.test(paste)) {
+          e.preventDefault();
+        }
+    });
+
+    // --- STRATEGY 4: Validation on Blur ---
+    phoneInput.addEventListener('blur', function() {
+        const val = this.value;
+        
+        // If empty, reset wrapper state
+        if (val === '') {
+            phoneWrapper.classList.add('empty');
+            return;
+        }
+
+        // Check Length (8 to 17 digits)
+        if (val.length < 8 || val.length > 17) {
+          errorMsg.style.display = 'block';
+          this.closest('.form-group').classList.add('has-error');
+        } else {
+          errorMsg.style.display = 'none';
+          this.closest('.form-group').classList.remove('has-error');
+        }
+    });
+
+    // Validation functions
+    function validateEmail(email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.com$/;
+      return emailRegex.test(email);
+    }
+
+function validatePhone(phone) {
+
+  const cleaned = phone.replace(/[^0-9+]/g, '');
+  
+  const digitsOnly = cleaned.replace(/\+/g, '');
+  
+  if (digitsOnly.length < 8 || digitsOnly.length > 17) {
+    return false;
+  }
+  
+  return /^\+?[0-9]+$/.test(cleaned);
+}
+    // Form data storage
+    const formData = {
+      companyName1: '',
+      companyName2: '',
+      companyName3: '',
+      incorporationDate: '',
+      name: '',
+      email: '',
+      phone: '',
+      termsAccepted: false
+    };
+
+    let currentPage = 1;
+
+    // Update progress indicators
+    function updateProgress() {
+      const progressCircle = document.getElementById('progressCircle');
+      const progressText = document.getElementById('progressText');
+      const pageTitle = document.getElementById('pageTitle');
+      const progressBar = document.getElementById('progressBar');
+
+      const totalCircumference = 125.6;
+      const progress = currentPage / 2;
+      const offset = totalCircumference - (totalCircumference * progress);
+
+      progressCircle.style.strokeDashoffset = offset;
+      progressText.innerHTML = `<strong>${currentPage}/2</strong>`;
+      pageTitle.textContent = `Page ${currentPage}`;
+      progressBar.style.width = `${progress * 100}%`;
+    }
+
+    // Clear error when user types in Company Name 1
+    document.getElementById('companyName1').addEventListener('input', function() {
+      if (this.value.trim().length > 0) {
+        this.closest('.form-group').classList.remove('has-error');
+      }
+    });
+
+    // Clear errors when user types in Page 2 fields
+    document.getElementById('name').addEventListener('input', function() {
+      if (this.value.trim().length > 0) {
+        this.closest('.form-group').classList.remove('has-error');
+      }
+    });
+
+    document.getElementById('email').addEventListener('input', function() {
+      if (this.value.trim().length > 0) {
+        this.closest('.form-group').classList.remove('has-error');
+      }
+    });
+
+    document.getElementById('phone').addEventListener('input', function() {
+      if (this.value.trim().length > 0) {
+        this.closest('.form-group').classList.remove('has-error');
+      }
+    });
+
+    // Clear error when terms checkbox is checked
+    document.getElementById('terms').addEventListener('change', function() {
+      if (this.checked) {
+        this.closest('.form-group').classList.remove('has-error');
+      }
+    });
+
+    // Navigation - Go to Page 2
+    function goToPage2() {
+      const c1Input = document.getElementById('companyName1');
+      
+      if (!c1Input.value.trim()) {
+        c1Input.closest('.form-group').classList.add('has-error');
+        c1Input.focus();
+        return;
+      }
+
+      formData.companyName1 = c1Input.value.trim();
+      formData.companyName2 = document.getElementById('companyName2').value.trim();
+      formData.companyName3 = document.getElementById('companyName3').value.trim();
+      formData.incorporationDate = document.getElementById('incorporationDate').value;
+
+      document.getElementById('page1').classList.remove('active');
+      document.getElementById('page2').classList.add('active');
+      currentPage = 2;
+      updateProgress();
+    }
+
+    // Navigation - Go back to Page 1
+    function goToPage1() {
+      document.getElementById('page2').classList.remove('active');
+      document.getElementById('page1').classList.add('active');
+      document.getElementById('error').classList.remove('active');
+      currentPage = 1;
+      updateProgress();
+    }
+
+    // Generate loading progress HTML
+    function generateLoadingProgress() {
+      const companyNames = [
+        formData.companyName1,
+        formData.companyName2,
+        formData.companyName3
+      ].filter(name => name);
+
+      let html = '';
+      companyNames.forEach((name, index) => {
+        html += `
+          <div class="loading-progress-item pending" id="progress-item-${index}">
+            <span class="loading-progress-icon" id="progress-icon-${index}">•</span>
+            <span id="progress-text-${index}">${name}</span>
+          </div>
+        `;
+      });
+
+      document.getElementById('loadingProgressList').innerHTML = html;
+    }
+
+    // Update loading progress
+    function updateLoadingProgress(index, status) {
+      const item = document.getElementById(`progress-item-${index}`);
+      const icon = document.getElementById(`progress-icon-${index}`);
+      const text = document.getElementById(`progress-text-${index}`);
+      const companyNames = [
+        formData.companyName1,
+        formData.companyName2,
+        formData.companyName3
+      ].filter(name => name);
+
+      item.classList.remove('pending', 'active');
+      
+      if (status === 'completed') {
+        item.classList.add('completed');
+        icon.innerHTML = '✓';
+        text.textContent = `${companyNames[index]}`;
+      } else if (status === 'active') {
+        item.classList.add('active');
+        icon.innerHTML = '<div class="loading-spinner"></div>';
+        text.textContent = `Checking ${companyNames[index]}...`;
+      }
+    }
+
+    // Submit form
+async function submitForm() {
+  const nameInput = document.getElementById('name');
+  const emailInput = document.getElementById('email');
+  const phoneInput = document.getElementById('phone');
+  const termsCheckbox = document.getElementById('terms');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const utmSource = urlParams.get('utm_source') || '';
+  const utmContent = urlParams.get('utm_content') || '';
+
+  let hasError = false;
+
+  // --- VALIDATION START ---
+  if (!nameInput.value.trim()) {
+    nameInput.closest('.form-group').classList.add('has-error');
+    nameInput.focus();
+    hasError = true;
+  }
+
+  if (!emailInput.value.trim() || !validateEmail(emailInput.value.trim())) {
+    emailInput.closest('.form-group').classList.add('has-error');
+    if (!hasError) emailInput.focus();
+    hasError = true;
+  }
+
+  if (!phoneInput.value.trim() || !validatePhone(phoneInput.value.trim())) {
+    phoneInput.closest('.form-group').classList.add('has-error');
+    if (!hasError) phoneInput.focus();
+    hasError = true;
+  }
+
+  if (!termsCheckbox.checked) {
+    termsCheckbox.closest('.form-group').classList.add('has-error');
+    if (!hasError) termsCheckbox.focus();
+    hasError = true;
+  }
+
+  if (hasError) return;
+  // --- VALIDATION END ---
+
+  formData.name = nameInput.value.trim();
+  formData.email = emailInput.value.trim();
+  formData.phone = selectedCountry.dialCode + phoneInput.value.replace(/^0+/, '');
+  formData.termsAccepted = termsCheckbox.checked;
+
+  document.getElementById('page2').classList.remove('active');
+  document.getElementById('loading').classList.add('active');
+
+  generateLoadingProgress();
+
+   // 1. Prepare Data
+  const companyNames = [
+    formData.companyName1,
+    formData.companyName2,
+    formData.companyName3
+  ].filter(name => name);
+
+  const userDataPayload = {
+    name: formData.name,
+    email: formData.email,
+    phone: formData.phone,
+    incorporationDate: formData.incorporationDate,
+    utm_source: utmSource,
+    utm_content: utmContent
+  };
+
+  // 🔹 THIS ARRAY IS YOUR "SESSION"
+  let sessionResults = []; 
+  const API_BASE_URL = 'https://us-central1-fusioneta-test.cloudfunctions.net/altomateLE';
+
+  try {
+    document.getElementById('loading').classList.add('active');
+
+    // -----------------------------------------------------------
+    // STEP 1: LOOP API 1 (Check names one by one to update UI)
+    // -----------------------------------------------------------
+    for (let i = 0; i < companyNames.length; i++) {
+      updateLoadingProgress(i, 'active'); // Update UI Bar
+
+      // Check ONE name
+      const response = await fetch(`${API_BASE_URL}/api/check-names`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyNames: [companyNames[i]], 
+          userData: userDataPayload
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.results[0]) {
+        updateLoadingProgress(i, 'completed');
+        
+        // 🔹 ADD TO SESSION ARRAY
+        sessionResults.push(data.results[0]); 
+      }
+    }
+
+    // Update global window (for displaying results to user)
+    window.checkResults = sessionResults;
+
+    // -----------------------------------------------------------
+    // STEP 2: CALL API 2 (Send the accumulated session data)
+    // -----------------------------------------------------------
+    // We send 'sessionResults' which contains ALL 3 checks.
+    // This replaces the backend SessionManager logic.
+    
+    const leadPayload = {
+      userData: userDataPayload,
+      checkedResults: sessionResults, // <--- Sends the full history
+      originalIntents: companyNames
+    };
+
+    fetch(`${API_BASE_URL}/api/process-lead`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(leadPayload)
+    }).then(() => console.log("Lead processing started..."));
+
+    // -----------------------------------------------------------
+    // STEP 3: SHOW UI
+    // -----------------------------------------------------------
+    document.getElementById('loading').classList.remove('active');
+    displayResults(window.checkResults);
+
+  } catch (error) {
+    console.error('Error:', error);
+    // Handle error UI
+  }
+}
+
+    // Display results
+    function displayResults(results) {
+      const resultsContainer = document.getElementById('resultsContainer');
+      resultsContainer.innerHTML = '';
+
+      results.forEach(result => {
+        if (!result.name) return;
+        
+        const resultDiv = document.createElement('div');
+        resultDiv.className = result.available ? 'result-item result-available' : 'result-item result-unavailable';
+        
+        const icon = result.available ? '✓' : '✗';
+        const status = result.available ? 'Available (Subject to SSM Approval)' : 'Not Available';
+        
+        resultDiv.innerHTML = `
+          <span class="result-icon">${icon}</span>
+          <span>${result.name} - ${status}</span>
+        `;
+        
+        resultsContainer.appendChild(resultDiv);
+      });
+
+      document.getElementById('contactEmail').textContent = formData.email;
+      document.getElementById('contactPhone').textContent = formData.phone;
+      document.getElementById('results').classList.add('active');
+      document.getElementById('progressBar').style.width = '100%';
+    }
+
+    // Reset form
+    function resetForm() {
+      document.getElementById('companyName1').value = '';
+      document.getElementById('companyName2').value = '';
+      document.getElementById('companyName3').value = '';
+      document.getElementById('incorporationDate').value = '';
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+      document.getElementById('phone').value = '';
+      document.getElementById('terms').checked = false;
+
+      document.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
+
+      document.getElementById('companyName1Wrapper').classList.add('empty');
+      document.getElementById('companyName2Wrapper').classList.add('empty');
+      document.getElementById('companyName3Wrapper').classList.add('empty');
+      document.getElementById('nameWrapper').classList.add('empty');
+      document.getElementById('emailWrapper').classList.add('empty');
+      document.getElementById('phoneWrapper').classList.add('empty');
+      document.getElementById('selectWrapper').classList.add('empty');
+      document.getElementById('clearIncorporation').style.display = 'none';
+
+      document.getElementById('results').classList.remove('active');
+      document.getElementById('page1').classList.add('active');
+      currentPage = 1;
+      updateProgress();
+    }
+
+    // Clear select function
+    function clearSelect() {
+      const select = document.getElementById('incorporationDate');
+      const wrapper = document.getElementById('selectWrapper');
+      select.value = '';
+      document.getElementById('clearIncorporation').style.display = 'none';
+      wrapper.classList.add('empty');
+    }
+
+    // Handle input wrapper states
+    function handleInputWrapper(inputId, wrapperId) {
+      const input = document.getElementById(inputId);
+      const wrapper = document.getElementById(wrapperId);
+      
+      input.addEventListener('input', function() {
+        if (this.value) {
+          wrapper.classList.remove('empty');
+        } else {
+          wrapper.classList.add('empty');
+        }
+      });
+      
+      input.addEventListener('blur', function() {
+        if (!this.value) {
+          wrapper.classList.add('empty');
+        }
+      });
+      
+      input.addEventListener('focus', function() {
+        wrapper.classList.remove('empty');
+      });
+    }
+
+    // Initialize all input wrappers
+    handleInputWrapper('companyName1', 'companyName1Wrapper');
+    handleInputWrapper('companyName2', 'companyName2Wrapper');
+    handleInputWrapper('companyName3', 'companyName3Wrapper');
+    handleInputWrapper('name', 'nameWrapper');
+    handleInputWrapper('email', 'emailWrapper');
+    handleInputWrapper('phone', 'phoneWrapper');
+
+    // Show/hide clear button for select
+    document.getElementById('incorporationDate').addEventListener('change', function() {
+      const clearBtn = document.getElementById('clearIncorporation');
+      const wrapper = document.getElementById('selectWrapper');
+      
+      if (this.value) {
+        clearBtn.style.display = 'flex';
+        wrapper.classList.remove('empty');
+      } else {
+        clearBtn.style.display = 'none';
+        wrapper.classList.add('empty');
+      }
+    });
+
+    // Show error page
+    function showError(errorMessage) {
+      document.getElementById('error').classList.add('active');
+    }
+
+    // Go back from error
+function goBackFromError() {
+  document.getElementById('error').classList.remove('active');
+  document.getElementById('page2').classList.add('active');
+}
+
+    // Retry submit
+    function retrySubmit() {
+      document.getElementById('error').classList.remove('active');
+      document.getElementById('loading').classList.add('active');
+      submitForm();
+    }
+
+    // Initial setup
+    updateProgress();
+  </script>
+</body>
+</html> 
+</div>

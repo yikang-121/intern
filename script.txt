@@ -1,0 +1,234 @@
+const API_URL = 'http://localhost:3000/api';
+
+// DOM Elements
+const form = document.getElementById('searchForm');
+const searchBtn = document.getElementById('searchBtn');
+const resultsSection = document.getElementById('resultsSection');
+const resultsContainer = document.getElementById('resultsContainer');
+const clearBtn = document.getElementById('clearBtn');
+const companyNameInput = document.getElementById('companyName');
+
+console.log('🔧 Initializing...');
+console.log('Form:', form);
+console.log('Results section:', resultsSection);
+console.log('Results container:', resultsContainer);
+
+// === Form Submission Handler ===
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  console.log('📝 Form submitted');
+  
+  const companyName = companyNameInput.value.trim();
+  if (!companyName) return showNotification('Please enter a company name', 'error');
+
+  const selectedServices = Array.from(
+    document.querySelectorAll('input[name="service"]:checked')
+  ).map(cb => cb.value);
+
+  if (selectedServices.length === 0)
+    return showNotification('Please select at least one service', 'error');
+
+  console.log('🔍 Starting search for:', companyName, 'Services:', selectedServices);
+  startSearch(companyName, selectedServices);
+});
+
+// === Clear Button ===
+clearBtn.addEventListener('click', () => {
+  console.log('🧹 Clearing results');
+  resultsSection.style.display = 'none';
+  resultsContainer.innerHTML = '';
+  form.reset();
+  const mydataCheckbox = document.querySelector('input[value="mydata"]');
+  if (mydataCheckbox) mydataCheckbox.checked = true;
+});
+
+// === Start Search ===
+async function startSearch(companyName, services) {
+  toggleLoadingState(true);
+  hideResults();
+
+  try {
+    showNotification('🔍 Starting search...', 'info');
+    console.log('📡 Sending request to:', `${API_URL}/start-check`);
+
+    const response = await fetch(`${API_URL}/start-check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companyName, services }),
+    });
+
+    console.log('📨 Response status:', response.status);
+
+    if (!response.ok) throw new Error(`Server error (${response.status})`);
+    const data = await response.json();
+
+    console.log('📦 Received data:', data);
+
+    if (!data.success) throw new Error(data.error || 'Unknown error from server.');
+
+    displayResults(data);
+    showNotification('✅ Search complete!', 'success');
+  } catch (error) {
+    console.error('❌ Search failed:', error);
+    showError(`Error: ${error.message}`);
+  } finally {
+    toggleLoadingState(false);
+  }
+}
+
+// === Display Results ===
+function displayResults(data) {
+  console.log('🎨 Displaying results:', data);
+  resultsContainer.innerHTML = '';
+
+  if (!data.results || Object.keys(data.results).length === 0) {
+    console.warn('⚠️ No results in data');
+    showError('No results returned from server.');
+    return;
+  }
+
+  let cardsCreated = 0;
+  Object.entries(data.results).forEach(([service, result]) => {
+    console.log(`📋 Creating card for ${service}:`, result);
+    const card = createResultCard(service, result, data.query);
+    resultsContainer.appendChild(card);
+    cardsCreated++;
+  });
+
+  console.log(`✅ Created ${cardsCreated} result card(s)`);
+  showResults();
+}
+
+// === Create Result Card ===
+function createResultCard(service, result, query) {
+  const card = document.createElement('div');
+  card.className = 'result-card';
+
+  let statusClass, statusText, statusIcon;
+
+  if (result.error) {
+    statusClass = 'status-error';
+    statusText = 'Error';
+    statusIcon = '⚠️';
+  } else if (result.exists) {
+    statusClass = 'status-exists';
+    statusText = 'Found';
+    statusIcon = '✓';
+  } else {
+    statusClass = 'status-not-found';
+    statusText = 'Not Found';
+    statusIcon = '✗';
+  }
+
+  let resultsHTML = '';
+
+  if (result.error) {
+    resultsHTML = `<div class="no-results"><p><strong>Error:</strong> ${escapeHtml(result.error)}</p></div>`;
+  } else if (result.results && result.results.length > 0) {
+    console.log(`📊 Processing ${result.results.length} companies`);
+    resultsHTML = '<div class="company-results">';
+    result.results.forEach((company, idx) => {
+      console.log(`  Company ${idx + 1}:`, company);
+      resultsHTML += `
+        <div class="company-item">
+          <div class="company-field"><span class="field-label">Company No:</span>
+            <span class="field-value">${escapeHtml(company.number || 'N/A')}</span>
+          </div>
+          <div class="company-field"><span class="field-label">Name:</span>
+            <span class="field-value">${escapeHtml(company.name || 'N/A')}</span>
+          </div>
+          <div class="company-field"><span class="field-label">Type:</span>
+            <span class="field-value">${escapeHtml(company.type || 'N/A')}</span>
+          </div>
+        </div>`;
+    });
+    resultsHTML += '</div>';
+  } else {
+    resultsHTML = `<div class="no-results"><p>No companies found.</p></div>`;
+  }
+
+  card.innerHTML = `
+    <div class="result-header">
+      <h3 class="service-title">${statusIcon} ${service.toUpperCase()}</h3>
+      <span class="status-badge ${statusClass}">${statusText}</span>
+    </div>
+    <div class="result-body">
+      <p><strong>Query:</strong> "${escapeHtml(query)}"</p>
+      ${resultsHTML}
+    </div>
+  `;
+
+  return card;
+}
+
+// === Utilities ===
+function showError(message) {
+  console.log('❌ Showing error:', message);
+  resultsContainer.innerHTML = `
+    <div class="result-card">
+      <div class="no-results">
+        <h3 style="color:red;">Error Occurred</h3>
+        <p>${escapeHtml(message)}</p>
+      </div>
+    </div>`;
+  showResults();
+}
+
+function showNotification(message, type = 'info') {
+  console.log(`📢 Notification [${type}]:`, message);
+  const existing = document.querySelector('.notification');
+  if (existing) existing.remove();
+
+  const notification = document.createElement('div');
+  notification.className = `notification notification-${type}`;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+
+  setTimeout(() => notification.classList.add('show'), 10);
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => notification.remove(), 300);
+  }, 3000);
+}
+
+function toggleLoadingState(isLoading) {
+  console.log('⚙️ Toggle loading:', isLoading);
+  const btnText = searchBtn.querySelector('.btn-text');
+  const btnLoader = searchBtn.querySelector('.btn-loader');
+
+  if (isLoading) {
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'flex';
+    searchBtn.disabled = true;
+    companyNameInput.disabled = true;
+  } else {
+    btnText.style.display = 'block';
+    btnLoader.style.display = 'none';
+    searchBtn.disabled = false;
+    companyNameInput.disabled = false;
+  }
+}
+
+function showResults() {
+  console.log('👁️ Showing results section');
+  resultsSection.style.display = 'block';
+  setTimeout(() => {
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
+}
+
+function hideResults() {
+  console.log('🙈 Hiding results (if any)');
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Make displayResults available globally for test button
+window.displayResults = displayResults;
+
+console.log('✅ Company Checker frontend initialized');
+console.log('API URL:', API_URL);
